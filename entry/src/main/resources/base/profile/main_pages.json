@@ -3,6 +3,7 @@
     "pages/Index",
     "pages/grade",
     "pages/login",
-    "pages/sync"
+    "pages/sync",
+    "pages/network"
   ]
 }

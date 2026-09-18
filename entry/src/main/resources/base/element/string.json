@@ -11,6 +11,14 @@
     {
       "name": "EntryAbility_label",
       "value": "label"
+    },
+    {
+      "name": "calendar_read_reason",
+      "value": "用于读取日程，避免重复创建网费到期提醒"
+    },
+    {
+      "name": "calendar_write_reason",
+      "value": "用于在日历中创建校园网套餐到期提醒日程"
     }
   ]
 }

@@ -16,6 +16,8 @@
     cells: [],
     gpa: null,
     balance: Number.NaN,
+    packageName: "",
+    packagePrice: Number.NaN,
     complete: true
   }, extra || {}));
 

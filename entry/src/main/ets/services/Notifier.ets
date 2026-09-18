@@ -24,6 +24,10 @@ export class Notifier {
     Notifier.publish(Config.NOTIFICATION_ID_ELECTRICITY, '电费余额不足', text);
   }
 
+  static publishNetworkAlert(text: string): void {
+    Notifier.publish(Config.NOTIFICATION_ID_NETWORK, '网费余额不足', text);
+  }
+
   static publishAuthentication(text: string): void {
     Notifier.publish(1006, '登录验证', text);
   }

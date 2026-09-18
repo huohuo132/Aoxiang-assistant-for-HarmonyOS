@@ -2,6 +2,7 @@ import { common } from '@kit.AbilityKit';
 import { promptAction } from '@kit.ArkUI';
 import { GradeMath } from '../model/GradeMath';
 import { GradeRecord } from '../model/GradeRecord';
+import { NetworkFeeMath } from '../model/NetworkFee';
 import { Store } from '../services/Store';
 import { Notifier } from '../services/Notifier';
 import { CampusData } from '../services/CampusData';
@@ -15,6 +16,9 @@ struct Index {
   @State weightedText: string = '--';
   @State courseCount: number = 0;
   @State electricityText: string = '--';
+  @State networkBalanceText: string = '--';
+  @State networkPackageText: string = '未设置';
+  @State networkRemindText: string = '--';
   @State hasCredentials: boolean = false;
   @State verified: boolean = false;
   @State alertEnabled: boolean = true;
@@ -179,6 +183,79 @@ struct Index {
 
           Column() {
             Row() {
+              Text('网费与日历提醒')
+                .fontSize(13)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Theme.ink)
+                .layoutWeight(1)
+              Text('详情 ›')
+                .fontSize(12)
+                .fontColor(Theme.primary)
+                .onClick(() => {
+                  this.getUIContext().getRouter().pushUrl({ url: 'pages/network' });
+                })
+            }
+            .width('100%')
+            Row() {
+              Text('当前套餐')
+                .fontSize(13)
+                .fontColor(Theme.muted)
+                .layoutWeight(1)
+              Text(this.networkPackageText)
+                .fontSize(13)
+                .fontColor(Theme.ink)
+            }
+            .width('100%')
+            .margin({ top: 10 })
+            Row() {
+              Text('账户余额')
+                .fontSize(13)
+                .fontColor(Theme.muted)
+                .layoutWeight(1)
+              Text(`${this.networkBalanceText} 元`)
+                .fontSize(13)
+                .fontColor(Theme.ink)
+            }
+            .width('100%')
+            .margin({ top: 8 })
+            Row() {
+              Text('提醒日期')
+                .fontSize(13)
+                .fontColor(Theme.muted)
+                .layoutWeight(1)
+              Text(this.networkRemindText)
+                .fontSize(13)
+                .fontWeight(FontWeight.Bold)
+                .fontColor(Theme.primary)
+            }
+            .width('100%')
+            .margin({ top: 8 })
+            Button('更新网费')
+              .width('100%')
+              .height(40)
+              .fontSize(14)
+              .fontWeight(FontWeight.Medium)
+              .fontColor(Theme.primary)
+              .backgroundColor(Theme.primaryLight)
+              .borderRadius(10)
+              .margin({ top: 12 })
+              .onClick(() => {
+                this.openSync('network');
+              })
+            Text('登录网络自助系统后可读取套餐与余额，并在日历中创建到期提醒')
+              .fontSize(11)
+              .fontColor(Theme.muted)
+              .margin({ top: 8 })
+          }
+          .alignItems(HorizontalAlign.Start)
+          .width('100%')
+          .padding(16)
+          .backgroundColor(Theme.surface)
+          .borderRadius(16)
+          .margin({ top: 14 })
+
+          Column() {
+            Row() {
               Text('账号')
                 .fontSize(13)
                 .fontWeight(FontWeight.Bold)
@@ -234,14 +311,39 @@ struct Index {
     this.weightedText = Number.isNaN(weighted) ? '--' : weighted.toFixed(2);
     const balance: number = Store.getElectricityBalance();
     this.electricityText = Number.isNaN(balance) ? '--' : balance.toFixed(2);
+    this.refreshNetwork();
     this.hasCredentials = Store.hasSavedCredentials();
     this.verified = Store.getBool(Config.KEY_CREDENTIALS_VERIFIED, false);
     this.alertEnabled = Store.getBool(Config.KEY_ELECTRICITY_ALERT_ENABLED, true);
     this.thresholdInput = `${Store.getNumber(Config.KEY_ELECTRICITY_ALERT_THRESHOLD, 20)}`;
   }
 
+  private refreshNetwork(): void {
+    const balance: number = Store.getNetworkBalance();
+    this.networkBalanceText = Number.isFinite(balance) ? balance.toFixed(2) : '--';
+    const price: number = Store.getNetworkPackagePrice();
+    const name: string = Store.getNetworkPackageName();
+    if (Number.isFinite(price) && price > 0) {
+      this.networkPackageText = name.length > 0 ? name : `${price}元套餐`;
+    } else {
+      this.networkPackageText = '未设置';
+    }
+    if (Number.isFinite(balance) && Number.isFinite(price) && price > 0) {
+      const covered: number = NetworkFeeMath.monthsCovered(balance, price);
+      if (covered === 0) {
+        this.networkRemindText = '余额不足，请充值';
+      } else {
+        const remind: number = NetworkFeeMath.reminderTime(balance, price,
+          Store.getNetworkLeadDays(), new Date());
+        this.networkRemindText = NetworkFeeMath.formatDate(remind);
+      }
+    } else {
+      this.networkRemindText = '--';
+    }
+  }
+
   private openSync(target: string): void {
-    if (!this.hasCredentials) {
+    if (target !== 'network' && !this.hasCredentials) {
       this.showToast('请先登录翱翔门户');
       this.getUIContext().getRouter().pushUrl({ url: 'pages/login' });
       return;

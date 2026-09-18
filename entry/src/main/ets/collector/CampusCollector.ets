@@ -5,7 +5,7 @@ import { CampusData } from '../services/CampusData';
 import { Store } from '../services/Store';
 import { GradeRecord, GradeRowData } from '../model/GradeRecord';
 
-export type SyncTarget = 'grades' | 'electricity' | 'validate' | 'bootstrap';
+export type SyncTarget = 'grades' | 'electricity' | 'validate' | 'bootstrap' | 'network';
 
 export interface CollectorResult {
   phase: string;
@@ -14,6 +14,8 @@ export interface CollectorResult {
   cells: Array<Array<string>>;
   gpa: number | null;
   balance: number;
+  packageName: string;
+  packagePrice: number;
   complete: boolean;
 }
 
@@ -62,7 +64,12 @@ export class CampusCollector {
     this.password = password;
     this.resetRunState();
     this.trackAuth();
-    const url: string = target === 'electricity' ? Config.ELECTRICITY_SSO : Config.EDUCATION_SSO;
+    let url: string = Config.EDUCATION_SSO;
+    if (target === 'electricity') {
+      url = Config.ELECTRICITY_SSO;
+    } else if (target === 'network') {
+      url = Config.NETWORK_PORTAL;
+    }
     try {
       this.controller.loadUrl(url);
     } catch (error) {
@@ -144,8 +151,8 @@ export class CampusCollector {
 
   private buildScript(template: string): string {
     const allowNavigation: boolean = Date.now() >= this.navigationCooldownUntil;
-    const canAutofill: boolean = this.target !== 'bootstrap' && !this.credentialsSubmitted &&
-      this.username.length > 0 && this.password.length > 0;
+    const canAutofill: boolean = this.target !== 'bootstrap' && this.target !== 'network' &&
+      !this.credentialsSubmitted && this.username.length > 0 && this.password.length > 0;
     const canFillSms: boolean = !this.smsSubmitted && this.smsCode.length > 0;
     let script: string = template;
     script = script.split('__MODE__').join(this.target);
@@ -200,6 +207,32 @@ export class CampusCollector {
       return;
     }
     const effectivePhase: string = phase === 'credentials_pending' ? 'credentials_required' : phase;
+
+    if (this.target === 'network') {
+      if (effectivePhase === 'network_login') {
+        this.listener.onStatus('请在页面中输入账号、密码和验证码完成登录');
+        return;
+      }
+      if (effectivePhase === 'network_waiting') {
+        this.listener.onStatus('正在读取套餐与余额…');
+        return;
+      }
+      if (effectivePhase === 'network_result') {
+        if (Number.isFinite(result.balance)) {
+          CampusData.applyNetworkFee(result.balance, result.packageName, result.packagePrice);
+          this.finish(true, `网费余额已更新：${result.balance.toFixed(2)} 元`);
+        } else {
+          this.listener.onStatus('未读取到网费信息，请确认已登录网络自助系统');
+        }
+        return;
+      }
+      if (effectivePhase === 'api_unavailable') {
+        this.listener.onStatus('正在打开网络自助系统…');
+        return;
+      }
+      this.listener.onStatus('正在读取套餐与余额…');
+      return;
+    }
 
     if (this.target === 'bootstrap') {
       if (effectivePhase === 'credentials_valid') {

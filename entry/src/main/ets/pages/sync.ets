@@ -31,7 +31,7 @@ struct SyncPage {
     const params = this.getUIContext().getRouter().getParams() as SyncPageParams;
     this.currentTarget = params?.target ?? 'grades';
     if (this.currentTarget !== 'grades' && this.currentTarget !== 'electricity' &&
-      this.currentTarget !== 'validate') {
+      this.currentTarget !== 'validate' && this.currentTarget !== 'network') {
       this.currentTarget = 'grades';
     }
     const chain: boolean = params?.chain ?? false;
@@ -39,7 +39,13 @@ struct SyncPage {
       this.targetQueue = ['grades', 'electricity'];
     }
     this.headerTitle = this.labelFor(this.currentTarget);
-    this.initialUrl = this.currentTarget === 'electricity' ? Config.ELECTRICITY_SSO : Config.EDUCATION_SSO;
+    if (this.currentTarget === 'network') {
+      this.initialUrl = Config.NETWORK_PORTAL;
+      this.showWeb = true;
+      this.statusText = '请在页面中输入账号、密码和验证码完成登录';
+    } else {
+      this.initialUrl = this.currentTarget === 'electricity' ? Config.ELECTRICITY_SSO : Config.EDUCATION_SSO;
+    }
     const apiScript: string = this.loadRawFile('api_collect.js');
     const autoScript: string = this.loadRawFile('auto_collect.js');
     this.collector = new CampusCollector(this.controller, this.createListener(), apiScript, autoScript);
@@ -77,11 +83,13 @@ struct SyncPage {
                 this.getUIContext().getRouter().back();
               })
             Column() {
-              Text('统一认证')
+              Text(this.currentTarget === 'network' ? '网络自助服务' : '统一认证')
                 .fontSize(16)
                 .fontWeight(FontWeight.Bold)
                 .fontColor(Theme.ink)
-              Text('请在页面中完成登录，成功后会自动继续')
+              Text(this.currentTarget === 'network'
+                ? '请输入账号、密码和验证码，成功后自动读取套餐与余额'
+                : '请在页面中完成登录，成功后会自动继续')
                 .fontSize(11)
                 .fontColor(Theme.muted)
             }
@@ -94,9 +102,10 @@ struct SyncPage {
           .backgroundColor(Theme.background)
         }
         .width('100%')
-        .height('100%')
+        .height(56)
         .alignItems(HorizontalAlign.Start)
         .justifyContent(FlexAlign.Start)
+        .hitTestBehavior(HitTestMode.Transparent)
       } else {
         Column() {
           Row() {
@@ -431,6 +440,9 @@ struct SyncPage {
     }
     if (target === 'electricity') {
       return '更新电费';
+    }
+    if (target === 'network') {
+      return '更新网费';
     }
     return '更新成绩';
   }

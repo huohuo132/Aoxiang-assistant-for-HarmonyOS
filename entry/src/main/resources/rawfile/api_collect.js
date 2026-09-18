@@ -11,6 +11,8 @@
     cells: [],
     gpa: null,
     balance: NaN,
+    packageName: "",
+    packagePrice: NaN,
     complete: true
   }, extra || {}));
   const state = () => window[stateKey];
@@ -318,6 +320,98 @@
     return balance !== null
       ? result("electricity_result", { balance: balance })
       : result("api_waiting");
+  }
+
+  const text = (value) => String(value == null ? "" : value).replace(/\s+/g, " ").trim();
+
+  const pageText = (root) => {
+    const source = root && root.body ? root.body.innerText : "";
+    return text(source);
+  };
+
+  // 只接受紧跟在标签后面的金额，且排除“50元包月不限量”这类套餐文案
+  const amountAtHead = (raw) => {
+    const source = String(raw == null ? "" : raw).replace(/,/g, "");
+    const match = source.match(/^[\s:：¥￥]*(-?\d+(?:\.\d+)?)\s*(.*)$/);
+    if (!match) return null;
+    const value = Number.parseFloat(match[1]);
+    if (!Number.isFinite(value) || value < 0 || value >= 1000000) return null;
+    if (/^元\s*包/.test(match[2])) return null;
+    return value;
+  };
+
+  const balanceFromDom = () => {
+    const labels = ["账户总余额", "帐户总余额", "账户余额", "帐户余额", "账户金额", "可用余额",
+      "剩余金额", "账户费用", "余额"];
+    const nodes = document.querySelectorAll("td, th, dd, dt, span, div, p, li, label, b, strong, h1, h2, h3");
+    for (const node of nodes) {
+      const raw = text(node.innerText || node.textContent || "");
+      if (!raw) continue;
+      if (labels.indexOf(raw.replace(/[:：]\s*$/, "")) < 0) continue;
+      const next = node.nextElementSibling;
+      if (next) {
+        const fromNext = amountAtHead(text(next.innerText || next.textContent || ""));
+        if (fromNext !== null) return fromNext;
+      }
+      const parent = node.parentElement;
+      if (parent) {
+        const fromParent = amountAtHead(text(parent.innerText || parent.textContent || "").replace(raw, ""));
+        if (fromParent !== null) return fromParent;
+      }
+    }
+    return null;
+  };
+
+  const balanceFromText = (source) => {
+    const keys = ["账户总余额", "帐户总余额", "账户余额", "帐户余额", "账户金额", "可用余额",
+      "剩余金额", "余额"];
+    for (const key of keys) {
+      let from = 0;
+      while (from < source.length) {
+        const index = source.indexOf(key, from);
+        if (index < 0) break;
+        const value = amountAtHead(source.slice(index + key.length, index + key.length + 20));
+        if (value !== null) return value;
+        from = index + key.length;
+      }
+    }
+    return null;
+  };
+
+  const packageFromText = (source) => {
+    const match = source.match(/(\d{1,3})\s*元\s*包\s*(月不限量|月|(\d{1,4})\s*GB|(\d{1,4})\s*G)/i);
+    if (!match) return null;
+    const price = Number.parseFloat(match[1]);
+    if (!Number.isFinite(price) || price <= 0) return null;
+    const traffic = match[2].replace(/\s+/g, "");
+    return { name: price + "元包" + traffic, price: price };
+  };
+
+  if (mode === "network") {
+    if (host !== "zizhu.nwpu.edu.cn") return result("api_unavailable");
+    const loginForm = document.querySelector("#login-form") ||
+      document.querySelector('form[action="/login"]') ||
+      document.querySelector('input[name="LoginForm[username]"]');
+    if (loginForm) return result("network_login");
+    const body = pageText(document);
+    if (!body) return result("network_waiting");
+    const balance = balanceFromDom();
+    const resolved = balance !== null ? balance : balanceFromText(body);
+    if (resolved === null) {
+      const current = state();
+      if (allowNavigation && path !== "/home" && !(current && current.redirected)) {
+        setState({ redirected: true });
+        location.replace(location.origin + "/home");
+        return result("clicked", { message: "direct_network_home" });
+      }
+      return result("network_waiting");
+    }
+    const pkg = packageFromText(body);
+    return result("network_result", {
+      balance: resolved,
+      packageName: pkg ? pkg.name : "",
+      packagePrice: pkg ? pkg.price : NaN
+    });
   }
 
   return result("api_unavailable");

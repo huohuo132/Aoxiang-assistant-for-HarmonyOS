@@ -2,6 +2,7 @@ import { preferences } from '@kit.ArkData';
 import { common } from '@kit.AbilityKit';
 import { Config } from '../common/Config';
 import { GradeRecord } from '../model/GradeRecord';
+import { NetworkFeeMath } from '../model/NetworkFee';
 
 interface GradeJson {
   course: string;
@@ -88,6 +89,28 @@ export class Store {
 
   static getElectricityBalance(): number {
     return Store.getNumber(Config.KEY_ELECTRICITY_BALANCE, Number.NaN);
+  }
+
+  static getNetworkBalance(): number {
+    return Store.getNumber(Config.KEY_NETWORK_BALANCE, Number.NaN);
+  }
+
+  static getNetworkPackageName(): string {
+    return Store.getString(Config.KEY_NETWORK_PACKAGE_NAME, '');
+  }
+
+  static getNetworkPackagePrice(): number {
+    return Store.getNumber(Config.KEY_NETWORK_PACKAGE_PRICE, Number.NaN);
+  }
+
+  static getNetworkLeadDays(): number {
+    const value: number = Store.getNumber(Config.KEY_NETWORK_LEAD_DAYS,
+      NetworkFeeMath.DEFAULT_LEAD_DAYS);
+    return value >= 0 ? value : NetworkFeeMath.DEFAULT_LEAD_DAYS;
+  }
+
+  static getNetworkCalendarEventId(): number {
+    return Store.getNumber(Config.KEY_NETWORK_CALENDAR_EVENT_ID, -1);
   }
 
   static hasSavedCredentials(): boolean {
